@@ -19,7 +19,7 @@ const DESC_PROTECAO = 'Digimon (célula calculada)';
 // Células livres para edição (todo o resto de cada aba fica travado).
 const ABAS_COM_ENTRADA = {
   'CONFIG': ['B2:B5'],
-  'LISTAS': ['A1:T2', 'A4:T63'],
+  'LISTAS': ['A1:T3', 'A5:T64'],
   'COMPRAS': ['A2:C2001', 'E2:G2001', 'I2:I2001'],
   'BULK': ['A1'],
   'FALTAS POR DECK': ['P1'],
@@ -63,6 +63,7 @@ function configurarPlanilha() {
     if (s && !s.isSheetHidden()) s.hideSheet();
   });
   atualizarFotos();
+  configurarFiltroBulk_(ss);
   aplicarProtecao_(ss);
   SpreadsheetApp.getUi().alert(
     'Planilha configurada.\n\n' +
@@ -198,8 +199,48 @@ function ajustarAlturas_() {
 function onEdit(e) {
   try {
     const nome = e.range.getSheet().getName();
+    if (nome === 'BULK' && e.range.getA1Notation() === 'A1') multiSelecionar_(e);
     if (['LISTAS', 'COMPRAS', 'CONFIG', 'BULK', 'FALTAS POR DECK', 'FALTAS GERAL'].indexOf(nome) >= 0) ajustarAlturas_();
   } catch (err) { /* ignora: é só estética */ }
+}
+
+// ---- BULK: filtro com vários decks --------------------------------------------------
+const TODAS_ = '(Todas as cartas)';
+
+/** A1 da BULK aceita valores fora da lista (a lista de decks fica em O2:O22, oculta). */
+function configurarFiltroBulk_(ss) {
+  const sh = ss.getSheetByName(BULK.aba);
+  if (!sh) return;
+  const regra = SpreadsheetApp.newDataValidation()
+    .requireValueInRange(sh.getRange('O2:O22'), true)
+    .setAllowInvalid(true)
+    .build();
+  sh.getRange('A1').setDataValidation(regra);
+}
+
+/**
+ * Multi-seleção: cada vez que um deck é escolhido na lista, ele é ligado ou desligado
+ * no conjunto já escolhido (nomes separados por ", ").
+ * "(Todas as cartas)" substitui o resto; escolher um deck tira o "(Todas as cartas)".
+ */
+function multiSelecionar_(e) {
+  const sh = e.range.getSheet();
+  const novo = String(e.value === undefined ? '' : e.value).trim();
+  if (novo === '') return;                         // apagou a célula: deixa vazio
+  const opcoes = sh.getRange('O2:O22').getValues()
+    .map(function (r) { return String(r[0]).trim(); }).filter(function (v) { return v !== ''; });
+  if (opcoes.indexOf(novo) < 0) return;            // texto digitado à mão: respeita
+  const antigo = String(e.oldValue === undefined ? '' : e.oldValue).trim();
+  let itens = antigo === '' ? [] : antigo.split(', ').map(function (v) { return v.trim(); })
+    .filter(function (v) { return v !== ''; });
+  if (novo === TODAS_) {
+    itens = (itens.length === 1 && itens[0] === TODAS_) ? [] : [TODAS_];
+  } else {
+    itens = itens.filter(function (v) { return v !== TODAS_; });
+    const i = itens.indexOf(novo);
+    if (i >= 0) itens.splice(i, 1); else itens.push(novo);
+  }
+  e.range.setValue(itens.join(', '));
 }
 
 function aplicarProtecao_(ss) {
