@@ -1,0 +1,13 @@
+# Inventário pessoal exportado da planilha
+inventario.csv
+
+# Imagens temporárias (o script converte para .jpg)
+*.webp
+
+# Python
+__pycache__/
+*.pyc
+
+# Sistema
+.DS_Store
+Thumbs.db
