@@ -3,14 +3,17 @@ Baixa as imagens das cartas e salva em ./cartas/ com o nome do código
 (ex.: EX13-035.jpg). Só baixa o que ainda não existe na pasta.
 
 MODOS DE USO
-  A) Pela planilha (o normal): na aba "Update de Fotos" copie a lista em Python
-     e cole no bloco NOVAS_CARTAS logo abaixo. O script baixa SÓ essas cartas,
-     converte para JPG e envia para o GitHub (git add + commit + push).
-  B) Sem lista (NOVAS_CARTAS vazio): baixa as cartas que você TEM e depois as dos
-     decks (inventário e decks abaixo), como antes.
+  A) Pela planilha (o normal): na aba "Update de Fotos" copie a coluna F (Ctrl+C),
+     rode o script e COLE quando ele pedir. A lista termina sozinha no "]".
+     O script baixa SÓ essas cartas, converte para JPG e envia para o GitHub
+     (git add + commit + push).
+     (Alternativa: colar a lista no bloco NOVAS_CARTAS logo abaixo.)
+  B) Sem lista (só apertar Enter quando ele pedir): baixa as cartas que você TEM e
+     depois as dos decks (inventário e decks abaixo), como antes.
   C) python baixar_imagens_digimon.py --catalogo : baixa o catálogo inteiro
      (muito mais lento e pesado; use com calma).
   Opções:  --sem-push  não envia para o GitHub (só baixa).
+           --stdin     lê a lista da entrada padrão (ex.: python script.py --stdin < lista.txt).
 
 DE ONDE VÊM OS CÓDIGOS
   - inventario.csv (opcional): exporte a aba INVENTÁRIO da planilha como CSV
@@ -134,6 +137,24 @@ def codigos_do_catalogo():
     return list(dict.fromkeys(cods))
 
 
+def ler_lista_colada():
+    """Pede para colar a lista da planilha. Termina no "]" ou numa linha vazia."""
+    print("Cole aqui a lista da aba 'Update de Fotos' (coluna F) e aperte Enter.")
+    print("Ela termina sozinha no ']'. Para usar inventário e decks, só aperte Enter.\n")
+    achados = []
+    while True:
+        try:
+            linha = input()
+        except EOFError:
+            break
+        if not linha.strip():
+            break
+        achados.extend(PADRAO_CODIGO.findall(linha.upper()))
+        if linha.strip().startswith("]"):
+            break
+    return list(dict.fromkeys(achados))
+
+
 MODO_CATALOGO = "--catalogo" in sys.argv
 FAZER_PUSH = "--sem-push" not in sys.argv
 
@@ -145,6 +166,14 @@ elif NOVAS_CARTAS:
     codigos = list(dict.fromkeys(c.strip().upper() for c in NOVAS_CARTAS if c.strip()))
     tenho = []
     print(f"Lista da planilha: {len(codigos)} cartas.\n")
+elif sys.stdin.isatty() or "--stdin" in sys.argv:
+    colados = ler_lista_colada()
+    if colados:
+        codigos = colados
+        tenho = []
+        print(f"\nLista colada: {len(codigos)} cartas.\n")
+    else:
+        codigos = None
 else:
     codigos = None
 

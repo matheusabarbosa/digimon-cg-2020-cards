@@ -44,11 +44,12 @@ O script:
 ### Pela planilha (o jeito normal)
 
 1. Na planilha, aba **Update de Fotos**, use o menu *Digimon > Verificar fotos no repositório*.
-2. Copie a coluna **F** inteira (da linha 2 até o `]`).
-3. No `baixar_imagens_digimon.py`, apague a linha `NOVAS_CARTAS = []` e cole a lista no lugar.
-4. Rode `python baixar_imagens_digimon.py`. O script baixa só essas cartas, converte para JPG e envia para o GitHub (`git add`, `commit`, `push`). Use `--sem-push` para só baixar.
+2. Copie a coluna **F** inteira (da linha 2 até o `]`) com Ctrl+C.
+3. Rode `python baixar_imagens_digimon.py` (dentro da pasta `digimon/`). Quando o script pedir, **cole a lista** (Ctrl+V). Ela termina sozinha no `]`.
+4. O script baixa só essas cartas, converte para JPG e envia para o GitHub (`git add`, `commit`, `push`). Use `--sem-push` para só baixar.
 
-Com `NOVAS_CARTAS` vazio, o script funciona como descrito abaixo (inventário e decks).
+Se apertar só Enter quando ele pedir a lista, o script usa o inventário e os decks (descritos abaixo).
+Também dá para colar a lista direto no bloco `NOVAS_CARTAS` do script, ou ler de um arquivo: `python baixar_imagens_digimon.py --stdin < lista.txt`.
 `python baixar_imagens_digimon.py --catalogo` baixa o catálogo inteiro (lento e pesado).
 
 ### Priorizar as cartas que você tem
