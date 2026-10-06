@@ -41,6 +41,16 @@ O script:
 3. Respeita o limite do site com uma pausa entre os downloads.
 4. Lista no final os códigos que falharam, para baixar à mão.
 
+### Pela planilha (o jeito normal)
+
+1. Na planilha, aba **Update de Fotos**, use o menu *Digimon > Verificar fotos no repositório*.
+2. Copie a coluna **F** inteira (da linha 2 até o `]`).
+3. No `baixar_imagens_digimon.py`, apague a linha `NOVAS_CARTAS = []` e cole a lista no lugar.
+4. Rode `python baixar_imagens_digimon.py`. O script baixa só essas cartas, converte para JPG e envia para o GitHub (`git add`, `commit`, `push`). Use `--sem-push` para só baixar.
+
+Com `NOVAS_CARTAS` vazio, o script funciona como descrito abaixo (inventário e decks).
+`python baixar_imagens_digimon.py --catalogo` baixa o catálogo inteiro (lento e pesado).
+
 ### Priorizar as cartas que você tem
 
 Na planilha, abra a aba **INVENTÁRIO** e faça *Arquivo > Fazer download > Valores separados por vírgula (.csv)*. Salve o arquivo nesta pasta com o nome `inventario.csv`. As cartas com `Tenho > 0` são baixadas primeiro. Sem esse arquivo, o script usa o inventário que vem embutido nele.

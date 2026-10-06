@@ -2,9 +2,15 @@
 Baixa as imagens das cartas e salva em ./cartas/ com o nome do código
 (ex.: EX13-035.jpg). Só baixa o que ainda não existe na pasta.
 
-ORDEM DE DOWNLOAD
-  1) Primeiro as cartas que você TEM.
-  2) Depois o resto (as que faltam / estão nos decks).
+MODOS DE USO
+  A) Pela planilha (o normal): na aba "Update de Fotos" copie a lista em Python
+     e cole no bloco NOVAS_CARTAS logo abaixo. O script baixa SÓ essas cartas,
+     converte para JPG e envia para o GitHub (git add + commit + push).
+  B) Sem lista (NOVAS_CARTAS vazio): baixa as cartas que você TEM e depois as dos
+     decks (inventário e decks abaixo), como antes.
+  C) python baixar_imagens_digimon.py --catalogo : baixa o catálogo inteiro
+     (muito mais lento e pesado; use com calma).
+  Opções:  --sem-push  não envia para o GitHub (só baixa).
 
 DE ONDE VÊM OS CÓDIGOS
   - inventario.csv (opcional): exporte a aba INVENTÁRIO da planilha como CSV
@@ -26,10 +32,23 @@ Uso pessoal: pausa entre os pedidos para respeitar o limite do site
 """
 import csv
 import glob
+import json
 import os
 import re
+import subprocess
+import sys
 import time
 import urllib.request
+
+# Tudo o que o script usa fica na pasta dele (cartas/, decks/, inventario.csv).
+PASTA_SCRIPT = os.path.dirname(os.path.abspath(__file__))
+os.chdir(PASTA_SCRIPT)
+
+# ---------------------------------------------------------------------------
+# COLE AQUI A LISTA DA ABA "Update de Fotos" (substitua a linha abaixo inteira).
+# ---------------------------------------------------------------------------
+NOVAS_CARTAS = []
+# ---------------------------------------------------------------------------
 
 # Inventário atual (cartas que você tem, Tenho > 0), conforme o arquivo de contexto.
 TENHO_EMBUTIDO = [
@@ -100,8 +119,39 @@ def ler_inventario_csv(caminho):
     return saida
 
 
+def codigos_do_catalogo():
+    """Lista todos os códigos do catálogo pela API pública (um pedido só)."""
+    url = ("https://digimoncard.io/api-public/getAllCards.php"
+           "?sort=name&series=Digimon%20Card%20Game&sortdirection=asc")
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        dados = json.loads(r.read().decode("utf-8"))
+    cods = []
+    for item in dados:
+        c = (item.get("cardnumber") or item.get("id") or "").strip().upper()
+        if c:
+            cods.append(c)
+    return list(dict.fromkeys(cods))
+
+
+MODO_CATALOGO = "--catalogo" in sys.argv
+FAZER_PUSH = "--sem-push" not in sys.argv
+
+if MODO_CATALOGO:
+    codigos = codigos_do_catalogo()
+    tenho = []
+    print(f"Catálogo: {len(codigos)} cartas.\n")
+elif NOVAS_CARTAS:
+    codigos = list(dict.fromkeys(c.strip().upper() for c in NOVAS_CARTAS if c.strip()))
+    tenho = []
+    print(f"Lista da planilha: {len(codigos)} cartas.\n")
+else:
+    codigos = None
+
 # 1) cartas que você tem
-if os.path.exists(ARQ_INVENTARIO):
+if codigos is not None:
+    pass
+elif os.path.exists(ARQ_INVENTARIO):
     tenho = ler_inventario_csv(ARQ_INVENTARIO)
     print(f"Inventário lido de {ARQ_INVENTARIO}: {len(tenho)} cartas com Tenho > 0.")
 else:
@@ -109,18 +159,19 @@ else:
     print(f"{ARQ_INVENTARIO} não encontrado: usando o inventário embutido ({len(tenho)} cartas).")
 
 # 2) o resto: decks embutidos + listas novas em ./decks/*.txt
-resto = list(DECKS_EMBUTIDOS)
-for arq in sorted(glob.glob(os.path.join(PASTA_DECKS, "*.txt"))):
-    with open(arq, encoding="utf-8") as f:
-        for linha in f:
-            if linha.strip().startswith("//"):
-                continue
-            m = PADRAO_CODIGO.search(linha)
-            if m:
-                resto.append(m.group(1))
+if codigos is None:
+    resto = list(DECKS_EMBUTIDOS)
+    for arq in sorted(glob.glob(os.path.join(PASTA_DECKS, "*.txt"))):
+        with open(arq, encoding="utf-8") as f:
+            for linha in f:
+                if linha.strip().startswith("//"):
+                    continue
+                m = PADRAO_CODIGO.search(linha)
+                if m:
+                    resto.append(m.group(1))
 
-codigos = list(dict.fromkeys(tenho + resto))  # únicos; as que você tem vêm primeiro
-print(f"Total: {len(codigos)} cartas ({len(set(tenho))} que você tem + {len(codigos) - len(set(tenho))} das listas).\n")
+    codigos = list(dict.fromkeys(tenho + resto))  # únicos; as que você tem vêm primeiro
+    print(f"Total: {len(codigos)} cartas ({len(set(tenho))} que você tem + {len(codigos) - len(set(tenho))} das listas).\n")
 
 try:
     from PIL import Image
@@ -130,6 +181,7 @@ except ImportError:
     print("Pillow não instalado: as imagens ficarão em .webp.\n")
 
 falhas = []
+baixadas = 0
 for i, codigo in enumerate(codigos, 1):
     destino_webp = os.path.join(PASTA, f"{codigo}.webp")
     destino_jpg = os.path.join(PASTA, f"{codigo}.jpg")
@@ -143,12 +195,32 @@ for i, codigo in enumerate(codigos, 1):
         if TEM_PIL:
             Image.open(destino_webp).convert("RGB").save(destino_jpg, "JPEG", quality=85)
             os.remove(destino_webp)
+        baixadas += 1
         print(f"[{i}/{len(codigos)}] {codigo}: ok")
     except Exception as e:
         print(f"[{i}/{len(codigos)}] {codigo}: FALHOU ({e})")
         falhas.append(codigo)
     time.sleep(1.5)
 
-print("\nConcluído.")
+print(f"\nConcluído: {baixadas} imagem(ns) nova(s).")
 if falhas:
     print("Baixar manualmente (abra a carta no site e salve a imagem):", ", ".join(falhas))
+
+
+def git(*args):
+    return subprocess.run(["git", *args], cwd=PASTA_SCRIPT, capture_output=True, text=True)
+
+
+if FAZER_PUSH:
+    print("\nEnviando para o GitHub...")
+    git("add", PASTA)
+    if git("diff", "--cached", "--quiet", "--", PASTA).returncode == 0:
+        print("Nada novo para enviar.")
+    else:
+        n_novas = len(git("diff", "--cached", "--name-only", "--", PASTA).stdout.split())
+        r = git("commit", "-m", f"Adiciona {n_novas} imagem(ns) de cartas")
+        print(r.stdout.strip() or r.stderr.strip())
+        r = git("push")
+        print(r.stdout.strip() or r.stderr.strip())
+        print("Enviado." if r.returncode == 0 else "O push falhou: rode 'git push' à mão e veja a mensagem acima.")
+    print("Agora, na planilha: menu Digimon > Verificar fotos no repositório.")
