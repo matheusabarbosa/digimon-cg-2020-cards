@@ -22,6 +22,7 @@ const ABAS_COM_ENTRADA = {
   'LISTAS': ['A1:T3', 'A5:T64'],
   'COMPRAS': ['A2:C2001', 'E2:G2001', 'I2:I2001'],
   'BULK': ['A1'],
+  'MONTAR DECK': ['A1'],
   'FALTAS POR DECK': ['P1'],
   'FALTAS GERAL': ['M1'],
 };
@@ -38,6 +39,9 @@ const ALTURA_PADRAO = 21;
 // Aba BULK: grade de fotos (5 colunas x 20 fileiras). O código de cada carta fica
 // na coluna oculta I, linhas 2 a 101 (carta k na linha k+1).
 const BULK = { aba: 'BULK', colunas: 5, fileiras: 20, colCodigo: 9, alturaLegenda: 54 };
+// Aba MONTAR DECK: lista completa de um deck (5 colunas x 12 fileiras), mesmo esquema.
+const MONTAR = { aba: 'MONTAR DECK', colunas: 5, fileiras: 12, colCodigo: 9, alturaLegenda: 58 };
+const GRADES = [BULK, MONTAR];
 
 // Separador de argumentos das fórmulas: ';' em planilhas pt-BR/es/de/fr..., ',' em en-US etc.
 function sep_() {
@@ -145,33 +149,37 @@ function fotoFormula_(ref) {
          'IF(' + semFoto + S + '"SEM FOTO"' + S + 'IMAGE(CONFIG!$B$2&' + ref + '&CONFIG!$B$3' + S + '1)))';
 }
 
-/** Fotos da aba BULK: carta k (1..100) na fileira (k-1)/5, coluna (k-1)%5. */
+/** Fotos das abas em grade (BULK e MONTAR DECK): carta k na fileira (k-1)/5, coluna (k-1)%5. */
 function fotosBulk_(ss) {
-  const sh = ss.getSheetByName(BULK.aba);
-  if (!sh) return;
-  const cod = columnLetter_(BULK.colCodigo);
-  for (let g = 0; g < BULK.fileiras; g++) {
-    const linha = [];
-    for (let cc = 0; cc < BULK.colunas; cc++) {
-      const k = g * BULK.colunas + cc + 1;
-      linha.push(fotoFormula_(cod + (k + 1)));
+  GRADES.forEach(function (G) {
+    const sh = ss.getSheetByName(G.aba);
+    if (!sh) return;
+    const cod = columnLetter_(G.colCodigo);
+    for (let g = 0; g < G.fileiras; g++) {
+      const linha = [];
+      for (let cc = 0; cc < G.colunas; cc++) {
+        const k = g * G.colunas + cc + 1;
+        linha.push(fotoFormula_(cod + (k + 1)));
+      }
+      sh.getRange(2 + 2 * g, 1, 1, G.colunas).setFormulas([linha]);
     }
-    sh.getRange(2 + 2 * g, 1, 1, BULK.colunas).setFormulas([linha]);
-  }
+  });
 }
 
-/** Alturas da aba BULK: fileira da foto alta, legenda média, e fileiras vazias baixas. */
+/** Alturas das abas em grade: fileira da foto alta, legenda média, e fileiras vazias baixas. */
 function alturasBulk_(ss, mostrar, altura) {
-  const sh = ss.getSheetByName(BULK.aba);
-  if (!sh) return;
-  const total = BULK.colunas * BULK.fileiras;
-  const cods = sh.getRange(2, BULK.colCodigo, total, 1).getDisplayValues();
-  const pts = Math.round(altura * 0.75);
-  for (let g = 0; g < BULK.fileiras; g++) {
-    const tem = cods[g * BULK.colunas][0] !== '';
-    sh.setRowHeightsForced(2 + 2 * g, 1, tem && mostrar ? pts : ALTURA_PADRAO);
-    sh.setRowHeightsForced(3 + 2 * g, 1, tem ? BULK.alturaLegenda : ALTURA_PADRAO);
-  }
+  GRADES.forEach(function (G) {
+    const sh = ss.getSheetByName(G.aba);
+    if (!sh) return;
+    const total = G.colunas * G.fileiras;
+    const cods = sh.getRange(2, G.colCodigo, total, 1).getDisplayValues();
+    const pts = Math.round(altura * 0.75);
+    for (let g = 0; g < G.fileiras; g++) {
+      const tem = cods[g * G.colunas][0] !== '';
+      sh.setRowHeightsForced(2 + 2 * g, 1, tem && mostrar ? pts : ALTURA_PADRAO);
+      sh.setRowHeightsForced(3 + 2 * g, 1, tem ? G.alturaLegenda : ALTURA_PADRAO);
+    }
+  });
 }
 
 /** Ajusta a altura das linhas: alta onde há foto, normal no resto. */
@@ -200,7 +208,7 @@ function onEdit(e) {
   try {
     const nome = e.range.getSheet().getName();
     if (nome === 'BULK' && e.range.getA1Notation() === 'A1') multiSelecionar_(e);
-    if (['LISTAS', 'COMPRAS', 'CONFIG', 'BULK', 'FALTAS POR DECK', 'FALTAS GERAL'].indexOf(nome) >= 0) ajustarAlturas_();
+    if (['LISTAS', 'COMPRAS', 'CONFIG', 'BULK', 'MONTAR DECK', 'FALTAS POR DECK', 'FALTAS GERAL'].indexOf(nome) >= 0) ajustarAlturas_();
   } catch (err) { /* ignora: é só estética */ }
 }
 
